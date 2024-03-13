@@ -39,19 +39,18 @@ inspi_index = resp_cycles['inspi_index'].values
 expi_index = resp_cycles['expi_index'].values
 
 
-Pnaz_iirfilt = iirfilt(raw_Pnaz, srate, lowcut = 0.05, highcut = 1.5, show = False)
+#Pnaz_iirfilt = iirfilt(raw_Pnaz, srate, lowcut = 0.05, highcut = 1.5, show = False)
 
-height = returnheight (Pnaz_iirfilt)
+#height = returnheight (Pnaz_iirfilt)
 
+med,mad = physio.compute_median_mad(resp)
+height = med + 1 * mad
 
-datascipy = frequenceScipy (Pnaz_iirfilt,srate,height,2)
-
+datascipy = frequenceScipy (resp,srate,height,1.2)
 
 respi_ind_scipy = datascipy['inds'].values
 datascipy['TCO2']= smooth_Tcco2[respi_ind_scipy]
 
-stats_quantitative (datascipy,'TCO2','freq','Valeur de la TCO2','Fréquence respiratoire (en Hz)')
-plt.show ()
 
 
 
@@ -66,7 +65,7 @@ ax.set_title('tcco2')
 
 ax = axs[1]
 ax.plot(time, raw_Pnaz)
-ax.plot(time,Pnaz_iirfilt)
+ax.plot(time,resp)
 ax.set_title('Pnaz')
 ax.scatter(time[respi_ind_scipy], resp[respi_ind_scipy], marker='o', color='magenta')
 
@@ -80,6 +79,12 @@ ax.scatter(time[expi_index], resp[expi_index], marker='o', color='red')
 ax.set_ylabel('resp NAZ')
 
 
+plt.show ()
+
+
+
+
+stats_quantitative (datascipy,'TCO2','freq','Valeur de la TCO2','Fréquence respiratoire (en Hz)')
 plt.show ()
 
 fig,axs =plt.subplots (nrows=2,sharex= True) 
