@@ -192,13 +192,13 @@ def replace_zeros_with_mean(signal):
 
     return cleaned_signal
 
-def replace_values_between_zero_and_ten_with_mean(signal):
+def clean_Sao(signal):
     cleaned_signal = np.copy(signal)  # Pour éviter de modifier le signal original
 
-    # Calculer la moyenne des valeurs non nulles dans le signal
-    non_zero_values = signal[(signal>20) & (~np.isnan(signal))]
-    mean_value = np.mean(non_zero_values)
+    # Calculer la moyenne des valeurs non nulles supérieures à 50 dans le signal
+    non_zero_values_above_75 = signal[(signal > 75) & (~np.isnan(signal))]
+    mean_value = np.mean(non_zero_values_above_75)
 
-    # Remplacer les valeurs entre 0 et 10 par la moyenne calculée
-    cleaned_signal[(cleaned_signal > 20) |np.isnan(cleaned_signal) ] = mean_value
+    # Remplacer les valeurs entre 0 et 75 par la moyenne des valeurs non nulles supérieures à 75
+    cleaned_signal[(cleaned_signal <= 75) | np.isnan(cleaned_signal)] = mean_value
     return cleaned_signal
