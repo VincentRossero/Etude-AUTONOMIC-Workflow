@@ -26,7 +26,7 @@ fig, axs = plt.subplots(nrows = 2, sharex = True)
 fig.suptitle('TEST')
 
 ax = axs[0]
-ax.plot(time, raw_Pnaz)
+ax.plot(time, raw_Sao2)
 ax.set_title('SAO2')
 
 ax = axs[1]
