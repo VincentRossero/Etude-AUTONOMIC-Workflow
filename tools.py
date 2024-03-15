@@ -179,3 +179,26 @@ def returnheight (sig) :
     height = med + 1 * mad
     return height
 
+
+def replace_zeros_with_mean(signal):
+    cleaned_signal = np.copy(signal)  # Pour éviter de modifier le signal original
+
+    # Calculer la moyenne des valeurs non nulles dans le signal
+    non_zero_values = signal[signal != 0]
+    mean_value = np.mean(non_zero_values)
+
+    # Remplacer les zéros par la moyenne calculée
+    cleaned_signal[cleaned_signal == 0] = mean_value
+
+    return cleaned_signal
+
+def replace_values_between_zero_and_ten_with_mean(signal):
+    cleaned_signal = np.copy(signal)  # Pour éviter de modifier le signal original
+
+    # Calculer la moyenne des valeurs non nulles dans le signal
+    non_zero_values = signal[(signal>20) & (~np.isnan(signal))]
+    mean_value = np.mean(non_zero_values)
+
+    # Remplacer les valeurs entre 0 et 10 par la moyenne calculée
+    cleaned_signal[(cleaned_signal > 20) |np.isnan(cleaned_signal) ] = mean_value
+    return cleaned_signal
