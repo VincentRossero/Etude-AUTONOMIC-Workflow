@@ -14,9 +14,13 @@ raw_Sao2, srate = physio.read_one_channel('EEG_28.TRC',format='micromed', channe
 
 
 
+
 raw_Sao2 = abs(raw_Sao2)
+
+
 smooth_Spo2 = replace_zeros_with_mean(raw_Spo2)
 
+smooth_Sao2 = clean_Sao (raw_Sao2)
 
 
 
@@ -26,15 +30,15 @@ fig, axs = plt.subplots(nrows = 2, sharex = True)
 fig.suptitle('TEST')
 
 ax = axs[0]
-ax.plot(time, raw_Sao2)
-ax.set_title('SAO2')
+ax.plot(time,raw_Sao2)
+ax.plot(time,smooth_Sao2)
+ax.set_title('Sao2')
 
 ax = axs[1]
-
+ax.plot(time,raw_Spo2)
 ax.plot(time, smooth_Spo2)
 #ax.plot(time,smooth_Spo)
 ax.set_title('spo2')
-ax.set_ylim(80,100)
+
 
 plt.show ()
-
