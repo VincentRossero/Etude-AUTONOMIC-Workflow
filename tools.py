@@ -202,3 +202,11 @@ def clean_Sao(signal):
  
     cleaned_signal[(cleaned_signal <= 79) | np.isnan(cleaned_signal)] = mean_value
     return cleaned_signal
+
+
+def convert_seconds_to_hh_mm_ss(seconds):
+    hours = seconds // 3600
+    seconds %= 3600
+    minutes = seconds // 60
+    seconds %= 60
+    return '{:02d}:{:02d}:{:02d}'.format(int(hours), int(minutes), int(seconds))
