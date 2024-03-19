@@ -196,8 +196,8 @@ def clean_Sao(signal):
     cleaned_signal = np.copy(signal)  # Pour éviter de modifier le signal original
 
 
-    non_zero_values_above_75 = signal[(signal > 79) & (~np.isnan(signal))]
-    mean_value = np.mean(non_zero_values_above_75)
+    non_zero_values_above_79 = signal[(signal > 79) & (~np.isnan(signal))]
+    mean_value = np.mean(non_zero_values_above_79)
 
  
     cleaned_signal[(cleaned_signal <= 79) | np.isnan(cleaned_signal)] = mean_value
