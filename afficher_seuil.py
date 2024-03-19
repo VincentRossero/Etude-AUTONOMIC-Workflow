@@ -51,9 +51,9 @@ for i, val in enumerate(below_threshold_spo2):
 
 
 # Calcul de la durée totale au-dessus du seuil de Tco2
-total_duration_above_tco2_threshold = np.sum(raw_tco2 > threshold_high_tcO2)
+total_duration_above_tco2_threshold = np.sum(raw_tco2 > threshold_high_tcO2) / srate
 # Calcul de la durée totale en dessous du seuil de SpO2
-total_duration_below_spo2_threshold = np.sum(clean_Spo2 < threshold_low_SpO2)
+total_duration_below_spo2_threshold = np.sum(clean_Spo2 < threshold_low_SpO2) / srate
 
 
 
