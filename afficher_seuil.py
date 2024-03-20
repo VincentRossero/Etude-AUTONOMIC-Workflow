@@ -37,7 +37,7 @@ for i, val in enumerate(above_threshold_tco2):
         start_index = i
     elif not val and start_index is not None:
         durations_above_threshold_tco2.append(time[i] - time[start_index])
-        index_debut_above_threshold_tco2.append(start_index)
+        index_debut_above_threshold_tco2.append(start_index/srate)
         start_index = None
 
 
@@ -50,7 +50,7 @@ for i, val in enumerate(below_threshold_spo2):
         start_index = i
     elif not val and start_index is not None:
         durations_below_threshold_spo2.append(time[i] - time[start_index])
-        index_debut_below_threshold_spo2.append(start_index)
+        index_debut_below_threshold_spo2.append(start_index/srate)
         start_index = None
 
 
