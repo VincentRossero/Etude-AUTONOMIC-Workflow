@@ -205,8 +205,12 @@ def clean_Sao(signal):
 
 
 def convert_seconds_to_hh_mm_ss(seconds):
+    seconds %= 86400  # On prend en compte les cycles de 24 heures
     hours = seconds // 3600
     seconds %= 3600
     minutes = seconds // 60
     seconds %= 60
     return '{:02d}:{:02d}:{:02d}'.format(int(hours), int(minutes), int(seconds))
+
+def format_hour_ticks(value, pos):
+    return convert_seconds_to_hh_mm_ss(value)
