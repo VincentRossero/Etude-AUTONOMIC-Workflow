@@ -214,3 +214,13 @@ def convert_seconds_to_hh_mm_ss(seconds):
 
 def format_hour_ticks(value, pos):
     return convert_seconds_to_hh_mm_ss(value)
+
+
+def calcul_med_mad(signal):
+    # Calcul de la médiane
+    med = np.median(signal)
+    
+    # Calcul de la déviation médiane absolue
+    mad = np.median(np.abs(signal - med))
+    
+    return med, mad
