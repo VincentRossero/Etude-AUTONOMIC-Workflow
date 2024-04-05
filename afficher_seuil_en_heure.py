@@ -86,7 +86,7 @@ print("Durée totale passée en dessous du seuil de SpO2:",total_duration_below_
 
 
 
-fig, axs = plt.subplots(nrows = 2, sharex = True)
+fig, axs = plt.subplots(nrows = 2)
 
 ax = axs[0]
 ax.plot(time,raw_Spo2)
@@ -99,6 +99,7 @@ ax = axs [1]
 
 ax.plot(time,smooth_Tcco2)
 ax.set_title('TCO2')
+ax.xaxis.set_major_formatter(FuncFormatter(format_hour_ticks))
 ax.set_title(f'nombre de passages au dessus du seuil de TCO2 : {num_threshold_crossings_tco2} ')
 ax.axhline(threshold_high_tcO2, color = 'r')
 
