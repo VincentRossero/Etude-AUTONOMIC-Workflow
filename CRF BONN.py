@@ -11,7 +11,7 @@ from compute_respiration_ceinture import *
 channels = ['Cz', 'Fz']
 data = []
 for channel in channels:
-    ch_data, srate = physio.read_one_channel('EEG_18.TRC', format='micromed', channel_name=channel)
+    ch_data, srate = physio.read_one_channel('EEG_31.TRC', format='micromed', channel_name=channel)
     #data.append(ch_data)
     data.append(ch_data * 1e-6)
 
@@ -35,10 +35,10 @@ eeg_name = 'Cz-Fz'
 sl = yasa.SleepStaging(raw, eeg_name=eeg_name)
 hypno = sl.predict()
 
-raw_tco2, srate = physio.read_one_channel('EEG_18.TRC', format='micromed', channel_name='tCO2+')
-raw_Spo2, srate = physio.read_one_channel('EEG_18.TRC', format='micromed', channel_name='SpO2+')
-raw_resp, srate = physio.read_one_channel('EEG_18.TRC',format='micromed', channel_name='Pnaz+')
-raw_abdo, srate = physio.read_one_channel('EEG_18.TRC',format='micromed', channel_name='abdo+')
+raw_tco2, srate = physio.read_one_channel('EEG_31.TRC', format='micromed', channel_name='tCO2+')
+raw_Spo2, srate = physio.read_one_channel('EEG_31.TRC', format='micromed', channel_name='SpO2+')
+raw_resp, srate = physio.read_one_channel('EEG_31.TRC',format='micromed', channel_name='Pnaz+')
+raw_abdo, srate = physio.read_one_channel('EEG_31.TRC',format='micromed', channel_name='abdo+')
 
 raw_resp=-raw_resp
 abdo = iirfilt(raw_abdo, srate, lowcut = 0.05, highcut = 2, show = False)
@@ -48,6 +48,7 @@ time_sec = np.arange(len(hypno)) * 30   #Multiplier par 30 pour obtenir le temps
 
 parameters = physio.get_respiration_parameters('human_airflow') 
 parameters['cycle_detection']['inspiration_adjust_on_derivative'] = True
+parameters['cycle_clean']['low_limit_log_ratio']=2
 resp, resp_cycles = physio.compute_respiration(raw_resp, srate, parameters=parameters)
 inspi_index = resp_cycles['inspi_index'].values
 expi_index = resp_cycles['expi_index'].values
@@ -109,7 +110,7 @@ total_apnea = total_apnea.sort_values(by='inspi_index')
 
 # ON ENELEVE LES PARTIES NON DESIREE 
 
-mask = (total_apnea['inspi_time'] >= 4460) & (total_apnea['inspi_time'] <= 17000)
+mask = (total_apnea['inspi_time'] >= 2750) & (total_apnea['inspi_time'] <= 19930)
 total_apnea = total_apnea[mask]
  
 
@@ -117,13 +118,14 @@ total_apnea = total_apnea.reset_index(drop=True)
 
 # SI TROP D ARTEFACTS 
 
-indices_to_keep = [1,2,3]
-total_apnea = total_apnea.loc[total_apnea.index.isin(indices_to_keep)]
+# indices_to_keep = [1,2,3]
+# total_apnea = total_apnea.loc[total_apnea.index.isin(indices_to_keep)]
 
 # SI BEAUCOUP D APNEE 
 
-# indices_a_supprimer = [2,3]
-# total_apnea = total_apnea.drop(indices_a_supprimer)
+indices_a_supprimer = [143,144,145,146,151,152,153,154]
+total_apnea = total_apnea.drop(indices_a_supprimer)
+
 
 
 time_sec_hypno = np.arange(len(hypno)) * 30
@@ -135,6 +137,10 @@ def get_hypno_value(time_point):
 
 # Ajouter une colonne avec les valeurs de l'hypnogramme à total_apnea
 total_apnea['hypno_value'] = total_apnea['inspi_time'].apply(get_hypno_value)
+
+
+
+
 
 show (total_apnea)
 
@@ -205,8 +211,8 @@ ax.set_ylabel('SPO2 (%)')
 plt.show()
 
 # Étape 1 : Définir la plage de temps d'intérêt
-start_time = 4460
-end_time = 17000
+start_time = 0
+end_time = 21180
 
 # Étape 2 : Créer un masque booléen pour sélectionner uniquement les temps dans la plage
 mask = (time_sec_hypno >= start_time) & (time_sec_hypno <= end_time)
@@ -235,3 +241,30 @@ for stage in stages:
 # Afficher les résultats
 for stage, time in time_in_each_stage.items():
     print(f"Temps passé dans le stade {stage} (entre 4460s et 17000s) : {time:.2f} minutes")
+
+# Grouper par 'hypno_value' et calculer la somme de 'total_duration' pour chaque groupe
+
+temps = total_apnea['total_duration'].sum()
+print ('temps total=',temps)
+
+
+somme_total_duration = total_apnea.groupby('hypno_value')['total_duration'].sum()
+nombre_apnee_par_groupe = total_apnea.groupby('hypno_value').size()
+print(somme_total_duration)
+print(nombre_apnee_par_groupe)
+
+#NOMBRE DE PASSAGE SOUS LE SEUIL DE SPO2 
+
+raw_Spo2 = raw_Spo2[int(3000*srate):int(9600*srate)]
+
+threshold_low_SpO2 = 90
+below_threshold_spo2 = raw_Spo2 < threshold_low_SpO2
+diff_below_spo2 = np.diff(below_threshold_spo2.astype(int))
+num_threshold_crossings_spo2 = np.sum(diff_below_spo2 == 1)
+
+total_time_below_threshold = np.sum(below_threshold_spo2) * (1 / srate)
+
+
+print("Nombre de passages de seuil pour SpO2:", num_threshold_crossings_spo2)
+print("Temps total passé sous le seuil SpO2 de 90 :", total_time_below_threshold, "secondes")
+
