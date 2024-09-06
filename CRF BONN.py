@@ -107,18 +107,24 @@ resp_cycles_a = resp_cycles_a[~resp_cycles_a['inspi_index'].isin(inspi_index_to_
 total_apnea=pd.concat([resp_cycles_a,resp_apnee_ampl], axis = 0,ignore_index=True)
 total_apnea = total_apnea.sort_values(by='inspi_index')
 
+# ON ENELEVE LES PARTIES NON DESIREE 
 
-
-
-
-
-
-
-#avant de faire le reset index, pensez a couper le segment 
+mask = (total_apnea['inspi_time'] >= 4460) & (total_apnea['inspi_time'] <= 17000)
+total_apnea = total_apnea[mask]
+ 
 
 total_apnea = total_apnea.reset_index(drop=True)
-# indices_to_keep = [7, 12, 14]
-# total_apnea = total_apnea.loc[total_apnea.index.isin(indices_to_keep)]
+
+# SI TROP D ARTEFACTS 
+
+indices_to_keep = [1,2,3]
+total_apnea = total_apnea.loc[total_apnea.index.isin(indices_to_keep)]
+
+# SI BEAUCOUP D APNEE 
+
+# indices_a_supprimer = [2,3]
+# total_apnea = total_apnea.drop(indices_a_supprimer)
+
 
 time_sec_hypno = np.arange(len(hypno)) * 30
 def get_hypno_value(time_point):
@@ -133,37 +139,6 @@ total_apnea['hypno_value'] = total_apnea['inspi_time'].apply(get_hypno_value)
 show (total_apnea)
 
 
-#visualisation des apnées
-
-fig,axs = plt.subplots(nrows=3,sharex=True)
-
-ax=axs[0]
-
-ax.plot(time,resp)
-ax.scatter(time[inspi_index], resp[inspi_index], marker='o', color='green')
-ax.scatter(time[expi_index], resp[expi_index], marker='o', color='red')
-
-for index, row in total_apnea.iterrows():
-    inspi_time = row['inspi_time']
-    if row['apnee']:
-        ax.axvline(inspi_time, color='k', lw=2, linestyle='--')
-    else:
-        ax.axvline(inspi_time, color='green', lw=2, linestyle='--')
-
-ax=axs[1]
-ax.plot (time,abdo)
-ax.scatter(time[inspi_clean_a],abdo[inspi_clean_a],color='g')
-ax.scatter(time[expi_clean_a],abdo[expi_clean_a],color='r')
-
-ax=axs[2]
-# ax.plot(time_sec, hypno, color='black')
-ax.plot(time, raw_Spo2, color='green')
-ax.axhline(90, color='red')
-ax.set_ylim(85, 100)
-ax.set_title('SPO2')
-ax.set_ylabel('SPO2 (%)')
-
-plt.show()
 
 
 
@@ -197,3 +172,66 @@ axs[2].set_ylabel('SPO2 (%)')
 plt.tight_layout()
 plt.show()
 
+#visualisation des apnées
+
+fig,axs = plt.subplots(nrows=3,sharex=True)
+
+ax=axs[0]
+
+ax.plot(time,resp)
+ax.scatter(time[inspi_index], resp[inspi_index], marker='o', color='green')
+ax.scatter(time[expi_index], resp[expi_index], marker='o', color='red')
+
+for index, row in total_apnea.iterrows():
+    inspi_time = row['inspi_time']
+    if row['apnee']:
+        ax.axvline(inspi_time, color='k', lw=2, linestyle='--')
+    else:
+        ax.axvline(inspi_time, color='green', lw=2, linestyle='--')
+
+ax=axs[1]
+ax.plot (time,abdo)
+ax.scatter(time[inspi_clean_a],abdo[inspi_clean_a],color='g')
+ax.scatter(time[expi_clean_a],abdo[expi_clean_a],color='r')
+
+ax=axs[2]
+# ax.plot(time_sec, hypno, color='black')
+ax.plot(time, raw_Spo2, color='green')
+ax.axhline(90, color='red')
+ax.set_ylim(85, 100)
+ax.set_title('SPO2')
+ax.set_ylabel('SPO2 (%)')
+
+plt.show()
+
+# Étape 1 : Définir la plage de temps d'intérêt
+start_time = 4460
+end_time = 17000
+
+# Étape 2 : Créer un masque booléen pour sélectionner uniquement les temps dans la plage
+mask = (time_sec_hypno >= start_time) & (time_sec_hypno <= end_time)
+
+# Filtrer l'hypnogramme et les temps pour ne garder que cette plage
+filtered_hypno = hypno[mask]
+filtered_time_sec = time_sec_hypno[mask]
+
+# Vérification : Combien de stades de sommeil sont dans cette plage ?
+print(f"Nombre d'éléments filtrés dans l'hypnogramme : {len(filtered_hypno)}")
+
+# Étape 3 : Calculer les durées pour chaque stade de sommeil
+durations_filtered = {}
+
+# Stades de sommeil et leurs correspondances de code
+stages = ['W', 'N1', 'N2', 'N3', 'R']
+time_in_each_stage = {}
+
+for stage in stages:
+    # Filtrer l'hypnogramme pour le stade donné
+    stage_mask = filtered_hypno == stage
+    time_in_stage = np.sum(stage_mask) * 30 / 60  # Multiplier par 30 pour convertir en secondes puis diviser par 60 pour les minutes
+    
+    time_in_each_stage[stage] = time_in_stage
+
+# Afficher les résultats
+for stage, time in time_in_each_stage.items():
+    print(f"Temps passé dans le stade {stage} (entre 4460s et 17000s) : {time:.2f} minutes")
