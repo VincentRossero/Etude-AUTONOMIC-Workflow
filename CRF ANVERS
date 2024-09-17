@@ -1,0 +1,383 @@
+import matplotlib.pyplot as plt
+import numpy as np
+import mne
+import yasa
+from matplotlib.ticker import FuncFormatter
+import pyedflib
+import physio
+from tools import *
+from compute_respiration_ceinture import *
+import pyedflib
+
+#REALISATION HYPNOGRAMME
+
+
+# Définir les canaux EEG, EOG et EMG à lire
+eeg_channels = ['EEG Fz', 'EEG Cz', 'EEG C4']
+eog_channels = ['EOG E1', 'EOG E2']
+emg_channel = 'EMG Chin1'  # Canaux EMG pour l'analyse musculaire
+
+# Fichier EDF
+fichier_edf = "03-004/03-004 PSG1_0001.EDF"
+f = pyedflib.EdfReader(fichier_edf)
+header = f.getHeader()
+print(header)
+
+# Indices des canaux EEG, EOG et EMG
+eeg_indices = {}
+eog_indices = {}
+emg_index = None
+
+available_eeg_channels = []
+available_eog_channels = []
+
+# Extraction des indices des canaux EEG
+for channel in eeg_channels:
+    try:
+        eeg_indices[channel] = f.getSignalLabels().index(channel)
+        available_eeg_channels.append(channel)
+    except ValueError:
+        print(f"Channel {channel} not found in the EDF file.")
+
+# Extraction des indices des canaux EOG
+for channel in eog_channels:
+    try:
+        eog_indices[channel] = f.getSignalLabels().index(channel)
+        available_eog_channels.append(channel)
+    except ValueError:
+        print(f"Channel {channel} not found in the EDF file.")
+
+# Extraction de l'indice du canal EMG
+try:
+    emg_index = f.getSignalLabels().index(emg_channel)
+except ValueError:
+    print(f"Channel {emg_channel} not found in the EDF file.")
+
+# Lire et normaliser les signaux EEG, EOG et EMG
+eeg_signals = {}
+eog_signals = {}
+emg_signal = None
+
+for channel, index in eeg_indices.items():
+    eeg_signals[channel] = f.readSignal(index) * 1e-6  # Normaliser les données EEG
+
+for channel, index in eog_indices.items():
+    eog_signals[channel] = f.readSignal(index) * 1e-6  # Normaliser les données EOG
+
+if emg_index is not None:
+    emg_signal = f.readSignal(emg_index) * 1e-6  # Normaliser les données EMG
+
+# Créer les infos pour MNE
+sfreq = f.getSampleFrequency(list(eeg_indices.values())[0])  # Fréquence d'échantillonnage
+
+reref_data = eeg_signals['EEG Cz'] - eeg_signals['EEG Fz']
+
+ch_names = ['C4-Fz'] + available_eog_channels + ['EMG Chin1']
+ch_types = ['eeg'] + ['eog'] * len(available_eog_channels) + ['emg']
+info = mne.create_info(ch_names=ch_names, sfreq=sfreq, ch_types=ch_types)
+
+
+data_array = np.zeros((len(ch_names), reref_data.size))
+data_array[0,:]=reref_data
+data_array[1,:]=eog_signals['EOG E1']
+data_array[2,:]=eog_signals['EOG E2']
+data_array[3,:]=emg_signal
+
+raw = mne.io.RawArray(data_array, info)
+sl = yasa.SleepStaging(raw, eeg_name='C4-Fz', eog_name='EOG E2')
+hypno = sl.predict()
+hyp = yasa.Hypnogram(hypno)
+plt.figure()
+yasa.plot_hypnogram(hyp)
+plt.show()
+print(hyp.sleep_statistics())
+
+
+# DONNES RESPIRATOIRES 
+
+indices = {
+    'tCO2': f.getSignalLabels().index('SaO2 TpCO2'),
+    'saO2': f.getSignalLabels().index('SaO2 SaO2'),
+    'resp': f.getSignalLabels().index('Resp Cann Raw'),
+    'resp_therm': f.getSignalLabels().index('Resp Therm'),
+    'resp_thor': f.getSignalLabels().index('Resp Thor'),
+    'resp_abd': f.getSignalLabels().index('Resp Abd')
+}
+
+signals = {}
+for channel, index in indices.items():
+    signals[channel] = f.readSignal(index)
+
+
+srate_tco2 = f.getSampleFrequency(indices['tCO2']) # valable pour respi nasale 256
+srate_Sao2 = f.getSampleFrequency(indices['saO2']) # 4
+srate_ceinture = f.getSampleFrequency(indices['resp_thor']) # 32
+
+#pre traitement
+
+signals['resp'] = - signals['resp']
+
+time_t = np.arange(signals['tCO2'].size) / srate_tco2 
+time_s =np.arange(signals['saO2'].size) / srate_Sao2 
+time_c = np.arange(signals['resp_thor'].size) / srate_ceinture 
+
+# DETECTION RESPI NASALE ET CEINTURE 
+
+parameters = physio.get_respiration_parameters('human_airflow') 
+parameters['cycle_detection']['inspiration_adjust_on_derivative'] = True
+
+resp, resp_cycles = physio.compute_respiration(signals['resp'], srate_tco2, parameters=parameters)
+inspi_index = resp_cycles['inspi_index'].values
+expi_index = resp_cycles['expi_index'].values
+
+#DETECTION CEINTURE 
+
+#detection ceinture abdominale 
+peak_inds_a, peak_inds_neg_a = detection_respi (signals['resp_abd'],srate_ceinture)
+inspi_clean_a, expi_clean_a =interleave_insp_exp(peak_inds_neg_a,peak_inds_a)
+respi_abdo = compute_respi_features (signals['resp_abd'],inspi_clean_a,expi_clean_a,srate_ceinture)
+#detection ceinture thoracique 
+peak_inds_t, peak_inds_neg_t = detection_respi (signals['resp_thor'],srate_ceinture)
+inspi_clean_t, expi_clean_t =interleave_insp_exp(peak_inds_neg_t,peak_inds_t)
+respi_thor = compute_respi_features (signals['resp_thor'],inspi_clean_t,expi_clean_t,srate_ceinture)
+
+#cycle de plus de 10 secondes
+x=10
+mask_apnea= resp_cycles['cycle_duration']>x
+resp_cycles_a=resp_cycles[mask_apnea]
+resp_cycles_a['total_duration']= resp_cycles_a['cycle_duration']
+resp_cycles_a['apnee']=True
+
+#cycle à faible amplitude
+amplitude_moyenne = resp_cycles['total_amplitude'].mean()
+seuil_apnee = amplitude_moyenne * 0.1
+mask_amplitude=resp_cycles['total_amplitude']<seuil_apnee
+resp_amplitude = resp_cycles[mask_amplitude]
+
+index_amplitude = resp_amplitude.index
+# Convertir les index en un DataFrame pour utiliser les opérations de décalage
+index_df = pd.DataFrame(index_amplitude, columns=['index'])
+
+# Créer une colonne qui indique les débuts de groupes consécutifs
+index_df['group'] = (index_df['index'] != index_df['index'].shift() + 1).cumsum()
+
+# Grouper par la colonne des groupes et récupérer les groupes d'indices consécutifs
+consecutive_groups = index_df.groupby('group')['index'].apply(list)
+
+result_indices = []
+total_durations = []
+
+# Parcourir les groupes et vérifier la somme des 'cycle_duration'
+
+for group in consecutive_groups:
+    
+    total_duration = resp_amplitude.loc[group, 'cycle_duration'].sum()
+
+    
+    if total_duration > 10.0:
+        # Ajouter le premier indice du groupe à la liste des résultats
+        result_indices.append(group[0])
+        total_durations.append(total_duration)
+
+resp_apnee_ampl = resp_amplitude.loc[result_indices]
+resp_apnee_ampl['total_duration'] = pd.Series(total_durations, index=result_indices)
+resp_apnee_ampl['apnee']=False
+
+inspi_index_to_drop = resp_apnee_ampl ['inspi_index'].tolist()
+resp_cycles_a = resp_cycles_a[~resp_cycles_a['inspi_index'].isin(inspi_index_to_drop)]
+
+
+#formation du tableau d'apnee final
+
+total_apnea=pd.concat([resp_cycles_a,resp_apnee_ampl], axis = 0,ignore_index=True)
+total_apnea = total_apnea.sort_values(by='inspi_index')
+
+
+# ON ENELEVE LES PARTIES NON DESIREE 
+
+# mask = (total_apnea['inspi_time'] >= 6000) & (total_apnea['inspi_time'] <= 38000)
+
+# total_apnea = total_apnea[mask]
+ 
+
+total_apnea = total_apnea.reset_index(drop=True)
+
+# SI TROP D ARTEFACTS 
+
+# indices_to_keep = [2,3,4]
+# total_apnea = total_apnea.loc[total_apnea.index.isin(indices_to_keep)]
+
+# SI BEAUCOUP D APNEE 
+
+# indices_a_supprimer = [2,3]
+# total_apnea = total_apnea.drop(indices_a_supprimer)
+
+
+time_sec_hypno = np.arange(len(hypno)) * 30
+def get_hypno_value(time_point):
+    # Trouver l'indice le plus proche dans time_sec_hypno
+    idx = np.searchsorted(time_sec_hypno, time_point, side='left')
+    # Retourner la valeur de hypno correspondant
+    return hypno[idx] if idx < len(hypno) else np.nan
+
+# Ajouter une colonne avec les valeurs de l'hypnogramme à total_apnea
+total_apnea['hypno_value'] = total_apnea['inspi_time'].apply(get_hypno_value)
+
+
+
+show (total_apnea)
+
+fig, axs = plt.subplots(nrows=3, sharex=True, figsize=(10, 8))
+
+axs[0].plot(time_sec_hypno, hypno, color='black')
+
+axs[0].set_title('Hypnogramme')
+axs[0].set_ylabel('Stades de sommeil')
+
+
+#axs[1].plot(time, raw_tco2, color='blue')
+axs[1].plot(time_t,signals['tCO2'],color='blue')
+
+axs[1].axhline(50, color='red')
+axs[1].set_title('TCO2')
+axs[1].set_ylabel('TCO2 (mmHh)')
+
+axs[2].plot(time_s, signals['saO2'], color='green')
+
+axs[2].axhline(90, color='red')
+axs[2].set_ylim(85, 100)
+axs[2].set_title('SPO2')
+axs[2].set_ylabel('SPO2 (%)')
+
+plt.tight_layout()
+plt.show()
+
+
+fig,axs = plt.subplots(nrows=3,sharex=True)
+
+ax=axs[0]
+
+ax.plot(time_t,resp)
+ax.scatter(time_t[inspi_index], resp[inspi_index], marker='o', color='green')
+ax.scatter(time_t[expi_index], resp[expi_index], marker='o', color='red')
+
+for index, row in total_apnea.iterrows():
+    inspi_time = row['inspi_time']
+    if row['apnee']:
+        ax.axvline(inspi_time, color='k', lw=2, linestyle='--')
+    else:
+        ax.axvline(inspi_time, color='green', lw=2, linestyle='--')
+
+ax=axs[1]
+ax.plot (time_c,signals['resp_abd'])
+ax.scatter(time_c[inspi_clean_a],signals['resp_abd'][inspi_clean_a],color='g')
+ax.scatter(time_c[expi_clean_a],signals['resp_abd'][expi_clean_a],color='r')
+
+ax=axs[2]
+ax.plot(time_t,signals['resp_therm'])
+
+plt.show()
+
+
+# Étape 1 : Définir la plage de temps d'intérêt
+start_time = 0
+end_time = 80000
+
+# Étape 2 : Créer un masque booléen pour sélectionner uniquement les temps dans la plage
+mask = (time_sec_hypno >= start_time) & (time_sec_hypno <= end_time)
+
+# Filtrer l'hypnogramme et les temps pour ne garder que cette plage
+filtered_hypno = hypno[mask]
+filtered_time_sec = time_sec_hypno[mask]
+
+# Vérification : Combien de stades de sommeil sont dans cette plage ?
+print(f"Nombre d'éléments filtrés dans l'hypnogramme : {len(filtered_hypno)}")
+
+# Étape 3 : Calculer les durées pour chaque stade de sommeil
+durations_filtered = {}
+
+# Stades de sommeil et leurs correspondances de code
+stages = ['W', 'N1', 'N2', 'N3', 'R']
+time_in_each_stage = {}
+
+for stage in stages:
+    # Filtrer l'hypnogramme pour le stade donné
+    stage_mask = filtered_hypno == stage
+    time_in_stage = np.sum(stage_mask) * 30 / 60  # Multiplier par 30 pour convertir en secondes puis diviser par 60 pour les minutes
+    
+    time_in_each_stage[stage] = time_in_stage
+
+# Afficher les résultats
+for stage, time in time_in_each_stage.items():
+    print(f"Temps passé dans le stade {stage}  : {time:.2f} minutes")
+
+# Grouper par 'hypno_value' et calculer la somme de 'total_duration' pour chaque groupe
+
+temps = total_apnea['total_duration'].sum()
+print ('temps total=',temps)
+
+
+somme_total_duration = total_apnea.groupby('hypno_value')['total_duration'].sum()
+nombre_apnee_par_groupe = total_apnea.groupby('hypno_value').size()
+print(somme_total_duration)
+print(nombre_apnee_par_groupe)
+
+
+# Étape 1 : Créer un masque booléen pour les valeurs de TCO2 > 50
+mask_tco2 = signals['tCO2'] > 50
+
+# Étape 2 : Extraire les temps correspondants à ce masque
+time_above_threshold = time_t[mask_tco2]
+
+# Étape 3 : Calculer la durée totale au-dessus du seuil
+if len(time_above_threshold) > 1:
+    # On utilise la différence entre les temps consécutifs pour calculer la durée
+    total_duration_above_50 = np.sum(np.diff(time_above_threshold))
+else:
+    total_duration_above_50 = 0
+
+print(f"Temps total passé au-dessus du seuil de 50 en TCO2 : {total_duration_above_50:.2f} secondes")
+
+# Étape 1 : Créer un masque booléen pour les valeurs de SpO2 < 90
+mask_spo2 = signals['saO2'] < 90
+
+# Étape 2 : Extraire les temps correspondants à ce masque
+time_below_threshold_spo2 = time_s[mask_spo2]
+
+# Étape 3 : Calculer la durée totale au-dessous du seuil
+if len(time_below_threshold_spo2) > 1:
+    total_duration_below_90 = np.sum(np.diff(time_below_threshold_spo2))
+else:
+    total_duration_below_90 = 0
+
+print(f"Temps total passé au-dessous du seuil de 90 en SpO2 : {total_duration_below_90:.2f} secondes")
+
+# Fonction pour obtenir les valeurs de l'hypnogramme à chaque point dans le temps
+def get_hypno_value(time_point):
+    idx = np.searchsorted(time_sec_hypno, time_point, side='left')
+    return hypno[idx] if idx < len(hypno) else np.nan
+
+# Temps passé pour TCO2 > 50 par stade de sommeil
+time_tco2_per_stage = {'W': 0, 'N1': 0, 'N2': 0, 'N3': 0, 'R': 0}
+time_spo2_per_stage = {'W': 0, 'N1': 0, 'N2': 0, 'N3': 0, 'R': 0}
+
+# Pour chaque point de temps au-dessus du seuil TCO2 > 50
+for t in time_above_threshold:
+    stage = get_hypno_value(t)
+    if stage in time_tco2_per_stage:
+        time_tco2_per_stage[stage] += 1 / srate_tco2  # 1/srate_tco2 pour chaque point correspond à une seconde
+
+# Pour chaque point de temps en dessous du seuil SpO2 < 90
+for t in time_below_threshold_spo2:
+    stage = get_hypno_value(t)
+    if stage in time_spo2_per_stage:
+        time_spo2_per_stage[stage] += 1 / srate_Sao2  # 1/srate_Sao2 pour chaque point correspond à une seconde
+
+# Afficher les résultats
+print("Temps passé au-dessus du seuil de 50 en TCO2 par stade de sommeil :")
+for stage, duration in time_tco2_per_stage.items():
+    print(f"Stade {stage} : {duration:.2f} secondes")
+
+print("\nTemps passé au-dessous du seuil de 90 en SpO2 par stade de sommeil :")
+for stage, duration in time_spo2_per_stage.items():
+    print(f"Stade {stage} : {duration:.2f} secondes")
