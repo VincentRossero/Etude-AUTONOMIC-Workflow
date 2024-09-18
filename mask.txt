@@ -1,0 +1,38 @@
+fichier_edf = "03-001/03-001 PSG1.EDF"
+mask = (total_apnea['inspi_time'] >= 5100) & (total_apnea['inspi_time'] <= 16000)
+indices_to_keep = [0,5]
+
+fichier_edf = "03-001/03-001 PSG2 00001.EDF"
+# mask = (total_apnea['inspi_time'] >= 6900) & (total_apnea['inspi_time'] <= 16300) 
+ATTENTION : baisse de l'amplitude oblige à scinder le signal en 2 
+
+
+
+fichier_edf = "03-002/03-002 PSG1_0001.EDF"
+mask = (total_apnea['inspi_time'] >= 3300) & (total_apnea['inspi_time'] <= 24740)
+en 0 > apnee obstructive 
+mask = (total_apnea['inspi_time'] >= 33350) & (total_apnea['inspi_time'] <= 35370)
+
+
+fichier_edf = "03-002/03-002 PSG2_0001.EDF"
+# mask = (total_apnea['inspi_time'] >= 5000) & (total_apnea['inspi_time'] <= 35270)
+# indices_to_keep = [2,3,4]
+
+fichier_edf = "03-003/003-003a.EDF"
+
+fichier_edf = "03-004/03-004 PSG1_0001.EDF"
+mask = (total_apnea['inspi_time'] >= 10800) & (total_apnea['inspi_time'] <= 13845)
+
+fichier_edf = "03-004/03-004 PSG2_0001.EDF"
+# mask = (total_apnea['inspi_time'] >= 10800) & (total_apnea['inspi_time'] <= 13845)
+indices_to_keep = [0,3]
+
+fichier_edf = "03-006/03-006 PSG1_0001.EDF"
+indices_to_keep = [0,1,2,5,6,7,8,10]
+
+fichier_edf = "03-006/03-006 PSG2_0001.EDF"
+indices_to_keep = [0,6,8,15,16]
+
+
+fichier_edf = "03-009/03-009 PSG1_0001.EDF"
+indices_to_keep = [0,1,2,7,8,11]
