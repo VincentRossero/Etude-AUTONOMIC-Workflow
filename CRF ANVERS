@@ -18,7 +18,7 @@ eog_channels = ['EOG E1', 'EOG E2']
 emg_channel = 'EMG Chin1'  # Canaux EMG pour l'analyse musculaire
 
 # Fichier EDF
-fichier_edf = "03-004/03-004 PSG1_0001.EDF"
+fichier_edf = "03-009/03-009 PSG2_0001.EDF"
 f = pyedflib.EdfReader(fichier_edf)
 header = f.getHeader()
 print(header)
@@ -195,7 +195,7 @@ total_apnea = total_apnea.sort_values(by='inspi_index')
 
 # ON ENELEVE LES PARTIES NON DESIREE 
 
-# mask = (total_apnea['inspi_time'] >= 6000) & (total_apnea['inspi_time'] <= 38000)
+# mask = (total_apnea['inspi_time'] >= 2170) & (total_apnea['inspi_time'] <= 37000)
 
 # total_apnea = total_apnea[mask]
  
@@ -204,13 +204,13 @@ total_apnea = total_apnea.reset_index(drop=True)
 
 # SI TROP D ARTEFACTS 
 
-# indices_to_keep = [2,3,4]
+# indices_to_keep = [0,1,2,7,8,11]
 # total_apnea = total_apnea.loc[total_apnea.index.isin(indices_to_keep)]
 
 # SI BEAUCOUP D APNEE 
 
-# indices_a_supprimer = [2,3]
-# total_apnea = total_apnea.drop(indices_a_supprimer)
+indices_a_supprimer = [1,2,5]
+total_apnea = total_apnea.drop(indices_a_supprimer)
 
 
 time_sec_hypno = np.arange(len(hypno)) * 30
@@ -338,19 +338,9 @@ else:
 
 print(f"Temps total passé au-dessus du seuil de 50 en TCO2 : {total_duration_above_50:.2f} secondes")
 
-# Étape 1 : Créer un masque booléen pour les valeurs de SpO2 < 90
-mask_spo2 = signals['saO2'] < 90
 
-# Étape 2 : Extraire les temps correspondants à ce masque
-time_below_threshold_spo2 = time_s[mask_spo2]
 
-# Étape 3 : Calculer la durée totale au-dessous du seuil
-if len(time_below_threshold_spo2) > 1:
-    total_duration_below_90 = np.sum(np.diff(time_below_threshold_spo2))
-else:
-    total_duration_below_90 = 0
 
-print(f"Temps total passé au-dessous du seuil de 90 en SpO2 : {total_duration_below_90:.2f} secondes")
 
 # Fonction pour obtenir les valeurs de l'hypnogramme à chaque point dans le temps
 def get_hypno_value(time_point):
@@ -368,16 +358,51 @@ for t in time_above_threshold:
         time_tco2_per_stage[stage] += 1 / srate_tco2  # 1/srate_tco2 pour chaque point correspond à une seconde
 
 # Pour chaque point de temps en dessous du seuil SpO2 < 90
+
+print("Temps passé au-dessus du seuil de 50 en TCO2 par stade de sommeil :")
+for stage, duration in time_tco2_per_stage.items():
+    print(f"Stade {stage} : {duration:.2f} secondes")
+
+
+
+
+# Étape 1 : Créer un masque booléen pour les valeurs de SpO2 < 90
+mask_spo2 = signals['saO2'] < 90
+
+# Étape 2 : Extraire les indices où SpO2 < 90
+indices_below_threshold_spo2 = np.where(mask_spo2)[0]
+
+# Étape 3 : Identifier les périodes continues où SpO2 est sous le seuil
+time_below_threshold_spo2 = time_s[indices_below_threshold_spo2]
+
+# Si aucune donnée n'est sous le seuil, on peut arrêter le calcul
+if len(time_below_threshold_spo2) == 0:
+    total_duration_below_90 = 0
+else:
+    # Calculer la durée totale en utilisant les différences entre points consécutifs
+    # Identifier les "groupes" continus d'indices où SpO2 < 90
+    index_df = pd.DataFrame(indices_below_threshold_spo2, columns=['index'])
+    index_df['group'] = (index_df['index'] != index_df['index'].shift() + 1).cumsum()
+
+    # Grouper par la colonne des groupes et calculer les durées de chaque groupe
+    total_duration_below_90 = 0
+    for _, group_indices in index_df.groupby('group')['index']:
+        # group_indices.values retourne les indices de chaque groupe sous forme de liste/array
+        start_time = time_s[group_indices.values[0]]
+        end_time = time_s[group_indices.values[-1]]
+        total_duration_below_90 += (end_time - start_time)
+
+print(f"Temps total passé au-dessous du seuil de 90 en SpO2 : {total_duration_below_90:.2f} secondes")
+# Temps passé pour SpO2 < 90 par stade de sommeil
+time_spo2_per_stage = {'W': 0, 'N1': 0, 'N2': 0, 'N3': 0, 'R': 0}
+
+# Pour chaque point de temps en dessous du seuil SpO2 < 90
 for t in time_below_threshold_spo2:
     stage = get_hypno_value(t)
     if stage in time_spo2_per_stage:
         time_spo2_per_stage[stage] += 1 / srate_Sao2  # 1/srate_Sao2 pour chaque point correspond à une seconde
 
-# Afficher les résultats
-print("Temps passé au-dessus du seuil de 50 en TCO2 par stade de sommeil :")
-for stage, duration in time_tco2_per_stage.items():
-    print(f"Stade {stage} : {duration:.2f} secondes")
-
-print("\nTemps passé au-dessous du seuil de 90 en SpO2 par stade de sommeil :")
+# Afficher les résultats du temps passé sous 90 % de SpO2 par stade de sommeil
+print("Temps passé au-dessous du seuil de 90 en SpO2 par stade de sommeil :")
 for stage, duration in time_spo2_per_stage.items():
     print(f"Stade {stage} : {duration:.2f} secondes")
