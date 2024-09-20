@@ -36,3 +36,42 @@ indices_to_keep = [0,6,8,15,16]
 
 fichier_edf = "03-009/03-009 PSG1_0001.EDF"
 indices_to_keep = [0,1,2,7,8,11]
+
+fichier_edf = "03-009/03-009 PSG2_0001.EDF"
+indices_a_supprimer = [1,2,5]
+total_apnea = total_apnea.drop(indices_a_supprimer)
+
+
+03 10  nuit 2 
+indices_to_keep = [10,28]
+
+
+fichier_edf = "03-011/03-011 PSG1_0001.EDF"
+indices_to_keep = [0,4,28,29,30,31,34,35,45,46,49,52,79]
+
+
+
+# indices_to_keep = [0,15,103,105,108,107,106]
+# total_apnea = total_apnea.loc[total_apnea.index.isin(indices_to_keep)]
+
+fichier_edf = "03-015/03-015 PSG1_0001.EDF"
+indices_to_keep= [0]
+
+fichier_edf = "03-015/03-015 PSG2_0001.EDF" 
+hypnogramme realisé sur electrode c4
+
+fichier_edf = "03-018/03-018 PSG1_0001.EDF"
+ATTENTION AU FLITRES
+signals['resp'] = iirfilt(signals['resp'], srate_tco2, lowcut = 0.05, highcut = 0.7, show = False)
+mask = (total_apnea['inspi_time'] >= 7500) & (total_apnea['inspi_time'] <= 80000)
+
+fichier_edf = "03-018/03-018 PSG2.EDF"
+ATTENTION AU FLITRES
+signals['resp'] = iirfilt(signals['resp'], srate_tco2, lowcut = 0.05, highcut = 0.7, show = False)
+indices_to_keep = [118,24,25,26,27,28,116,2,56,57,58,72,73,81,82,83,84,85,86,117,115,98,102,96,95,91,90,88]
+total_apnea = total_apnea.loc[total_apnea.index.isin(indices_to_keep)]
+Ca c'est les apnees centrales 
+
+fichier_edf = "03-019/03-019 PSG1.EDF"
+mask = (total_apnea['inspi_time'] >= 3720) & (total_apnea['inspi_time'] <= 38260)
+indices_to_keep = [3,8,25]
